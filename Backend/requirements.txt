@@ -4,4 +4,4 @@ python-dotenv
 langchain
 openai
 huggingface_hub
-
+gunicorn
