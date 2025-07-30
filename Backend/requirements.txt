@@ -6,4 +6,5 @@ huggingface_hub
 gunicorn
 langchain-google-genai
 langchain_huggingface
+langchain_community
 
