@@ -26,9 +26,7 @@ llm1 = HuggingFaceEndpoint(
     repo_id="google/gemma-2-2b-it",
     task="text-generation"
 )
-
-GOOGLE_API_KEY = os.getenv("HUGGINGFACEHUB_API_TOKEN")
-llm = ChatHuggingFace(llm=llm1, api_key=GOOGLE_API_KEY)
+llm = ChatHuggingFace(llm=llm1)
 
 class TopicRequest(BaseModel):
     topic: str
