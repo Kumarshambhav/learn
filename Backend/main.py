@@ -16,7 +16,7 @@ app = FastAPI()
 # CORS config for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://learn-six-weld.vercel.app"],
+    allow_origins=["https://learn-six-weld.vercel.app", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
