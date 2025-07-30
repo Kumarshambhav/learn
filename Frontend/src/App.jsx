@@ -14,7 +14,7 @@ function App() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('http://localhost:8000/api/topic', {
+      const res = await fetch('https://learn-1-zs6v.onrender.com/api/topic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic }),
