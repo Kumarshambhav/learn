@@ -24,7 +24,7 @@ app.add_middleware(
 
 # Load HuggingFace LLM
 llm1 = HuggingFaceEndpoint(
-    repo_id="google/gemma-2-2b-it",
+    repo_id="nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",
     task="text-generation"
 )
 llm = ChatHuggingFace(llm=llm1)
