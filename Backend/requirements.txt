@@ -3,4 +3,5 @@ uvicorn
 python-dotenv
 langchain
 openai
-langchain transformers huggingface_hub
+huggingface_hub
+transformer
