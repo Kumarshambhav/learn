@@ -14,7 +14,7 @@ function App() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('https://learn-2pj7.onrender.com/api/topic', {
+      const res = await fetch('https://learn-ldq7.onrender.com/api/topic', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic }),
