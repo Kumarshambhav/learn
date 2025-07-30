@@ -1,91 +1,88 @@
-from fastapi import FastAPI, Request, Query
+# main.py
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from langchain.prompts import PromptTemplate
-from langchain_core.runnables import RunnableSequence
-from langchain_community.llms import HuggingFaceHub
-import os
 from dotenv import load_dotenv
+import os, re
+from langchain.chains import LLMChain
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_huggingface import ChatHuggingFace ,HuggingFaceEndpoint
 
 load_dotenv()
 
 app = FastAPI()
 
-# CORS for frontend-backend communication
+# CORS for frontend on localhost:5173
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # in production, specify allowed origins
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Request body model
+
+
+GOOGLE_API_KEY = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+llm  = HuggingFaceEndpoint(
+    repo_id = "google/gemma-2-2b-it",
+    task="text-generation"
+)
+model1 = ChatHuggingFace(llm=llm)
+
 class TopicRequest(BaseModel):
     topic: str
 
-# Hugging Face setup
-hf_api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
-
-llm = HuggingFaceHub(
-    repo_id="Qwen/Qwen3-Coder-480B-A35B-Instruct",  # or use any other supported HF model
-
-    huggingfacehub_api_token=hf_api_key
-)
-
-# Prompt template
-prompt_template = PromptTemplate(
-    input_variables=["topic"],
-    template="""
-Explain the topic "{topic}" in the following structure:
-
-### History
-### Why & How
-### Layman Explanation
-### Beginner Q&A
-"""
-)
-
-# Shared function to handle both POST and GET
-async def handle_topic_request(topic: str):
-    chain = prompt_template | llm
-    response = chain.invoke({"topic": topic})
-
-    result = {
-        "History": "Could not generate content.",
-        "Why & How": "Could not generate content.",
-        "Layman Explanation": "Could not generate content.",
-        "Beginner Q&A": "Could not generate content.",
-    }
-
-    if isinstance(response, str):
-        parts = response.split("###")
-        for part in parts:
-            if "History" in part:
-                result["History"] = part.replace("History", "").strip()
-            elif "Why & How" in part:
-                result["Why & How"] = part.replace("Why & How", "").strip()
-            elif "Layman Explanation" in part:
-                result["Layman Explanation"] = part.replace("Layman Explanation", "").strip()
-            elif "Beginner Q&A" in part:
-                result["Beginner Q&A"] = part.replace("Beginner Q&A", "").strip()
-
-    return result
-
-# POST endpoint
 @app.post("/api/topic")
-async def post_topic(req: TopicRequest):
+async def generate_content(req: TopicRequest):
+    
     try:
-        return await handle_topic_request(req.topic)
-    except Exception as e:
-        return {"error": str(e)}
+        print("Received topic:", req.topic)
+        prompt_template = PromptTemplate( template="""
+You are an educational AI that explains topics to beginners.
 
-# ✅ Added GET support for browser testing
-@app.get("/api/topic")
-async def get_topic(topic: str = Query(...)):
-    try:
-        return await handle_topic_request(topic)
+Given the topic: "{topic}", generate:
+
+1. History of the topic (150 words)
+2. Why & How it works (150 words)
+3. Explain in Layman Language (100 words)
+4. 5 Beginner Q&A related to it
+
+Output format must be:
+{{
+  "History": "...",
+  "Why & How": "...",
+  "Layman Explanation": "...",
+  "Beginner Q&A": "..."
+}}
+""",
+input_variables=["topic"])
+        parser = StrOutputParser()
+        chain = prompt_template | model1 | parser
+        response = chain.invoke({"topic": req.topic})
+
+        # Try to parse response using regex fallback
+        sections = ["History", "Why & How", "Layman Explanation", "Beginner Q&A"]
+        result = {}
+        for section in sections:
+            pattern = rf'"{section}"\s*:\s*"(.+?)"(?:,|\n|$)'
+            match = re.search(pattern, response, re.DOTALL)
+            if match:
+                result[section] = match.group(1).strip()
+            else:
+                result[section] = "Could not parse this section."
+
+        return result
+
     except Exception as e:
-        return {"error": str(e)}
+        print("Error:", str(e))
+        return {
+            "History": "Could not generate content.",
+            "Why & How": "Could not generate content.",
+            "Layman Explanation": "Could not generate content.",
+            "Beginner Q&A": "Could not generate content.",
+            "error": str(e)
+        }
 
 
