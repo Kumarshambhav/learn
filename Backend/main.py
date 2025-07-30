@@ -4,7 +4,6 @@ from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os, re
-from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
@@ -13,7 +12,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS config for frontend
+# ✅ CORS for local and deployed frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://learn-six-weld.vercel.app", "http://localhost:5173"],
@@ -22,18 +21,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load HuggingFace LLM
+# ✅ Load HuggingFace LLM (replace with your working repo_id and key)
 llm1 = HuggingFaceEndpoint(
     repo_id="nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",
     task="text-generation"
 )
 llm = ChatHuggingFace(llm=llm1)
 
-# Request model
+# ✅ Request model
 class TopicRequest(BaseModel):
     topic: str
 
-# ✅ Root route to avoid 404 on "/"
+# ✅ Home route
 @app.get("/", response_class=HTMLResponse)
 def root():
     return """
@@ -47,12 +46,12 @@ def root():
     </html>
     """
 
-# ✅ Favicon handler (optional)
+# ✅ Favicon route
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse("static/favicon.ico")  # Make sure this file exists if you use it
+    return FileResponse("static/favicon.ico")
 
-# ✅ Core API endpoint
+# ✅ Main route to generate content
 @app.post("/api/topic")
 async def generate_content(req: TopicRequest):
     try:
@@ -74,15 +73,22 @@ Output format must be:
   "Beginner Q&A": "..."
 }}
 """)
-        chain = LLMChain(llm=llm, prompt=prompt_template)
-        response = chain.run(topic=req.topic)
 
-        # Regex-based section extraction
+        # ✅ New LangChain chain syntax
+        chain = prompt_template | llm
+        response = chain.invoke({"topic": req.topic})
+
+        print("Raw LLM Response:", response)
+
+        # ✅ Handle output format (response could be string or dict depending on model)
+        raw_text = response if isinstance(response, str) else str(response)
+
+        # ✅ Parse the response using regex
         sections = ["History", "Why & How", "Layman Explanation", "Beginner Q&A"]
         result = {}
         for section in sections:
             pattern = rf'"{section}"\s*:\s*"(.+?)"(?:,|\n|$)'
-            match = re.search(pattern, response, re.DOTALL)
+            match = re.search(pattern, raw_text, re.DOTALL)
             if match:
                 result[section] = match.group(1).strip()
             else:
@@ -99,3 +105,4 @@ Output format must be:
             "Beginner Q&A": "Could not generate content.",
             "error": str(e)
         }
+
