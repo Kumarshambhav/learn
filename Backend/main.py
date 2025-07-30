@@ -28,8 +28,8 @@ class TopicRequest(BaseModel):
 hf_api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 llm = HuggingFaceHub(
-    repo_id="nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",  # or use any other supported HF model
-   
+    repo_id="Qwen/Qwen3-Coder-480B-A35B-Instruct",  # or use any other supported HF model
+   model_kwargs={"temperature": 0.7, "max_length": 1024}
     huggingfacehub_api_token=hf_api_key
 )
 
