@@ -1,6 +1,6 @@
-# main.py
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os, re
@@ -13,7 +13,7 @@ load_dotenv()
 
 app = FastAPI()
 
-# CORS for frontend on localhost:5173
+# CORS config for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://learn-six-weld.vercel.app"],
@@ -22,15 +22,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Load HuggingFace LLM
 llm1 = HuggingFaceEndpoint(
     repo_id="google/gemma-2-2b-it",
     task="text-generation"
 )
 llm = ChatHuggingFace(llm=llm1)
 
+# Request model
 class TopicRequest(BaseModel):
     topic: str
 
+# ✅ Root route to avoid 404 on "/"
+@app.get("/", response_class=HTMLResponse)
+def root():
+    return """
+    <html>
+        <head><title>LaymanLearn Backend</title></head>
+        <body style="font-family: sans-serif;">
+            <h2>🚀 FastAPI backend is running!</h2>
+            <p>POST to <code>/api/topic</code> with a JSON body like:</p>
+            <pre>{ "topic": "Blockchain" }</pre>
+        </body>
+    </html>
+    """
+
+# ✅ Favicon handler (optional)
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse("static/favicon.ico")  # Make sure this file exists if you use it
+
+# ✅ Core API endpoint
 @app.post("/api/topic")
 async def generate_content(req: TopicRequest):
     try:
@@ -55,7 +77,7 @@ Output format must be:
         chain = LLMChain(llm=llm, prompt=prompt_template)
         response = chain.run(topic=req.topic)
 
-        # Try to parse response using regex fallback
+        # Regex-based section extraction
         sections = ["History", "Why & How", "Layman Explanation", "Beginner Q&A"]
         result = {}
         for section in sections:
