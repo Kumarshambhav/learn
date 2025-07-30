@@ -4,3 +4,5 @@ python-dotenv
 langchain
 huggingface_hub
 gunicorn
+langchain-google-genai
+
