@@ -1,103 +1,79 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
+from langchain.chat_models import ChatOpenAI
+from langchain.prompts import PromptTemplate
+from langchain_core.runnables import RunnableSequence
+import os
 from dotenv import load_dotenv
-import os, re
-from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 load_dotenv()
 
 app = FastAPI()
 
-# ✅ CORS for local and deployed frontend
+# CORS middleware for frontend-backend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://learn-six-weld.vercel.app", "http://localhost:5173"],
+    allow_origins=["*"],  # change to your frontend domain in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Load HuggingFace LLM (replace with your working repo_id and key)
-llm1 = HuggingFaceEndpoint(
-    repo_id="nvidia/Llama-3_3-Nemotron-Super-49B-v1_5",
-    task="text-generation"
-)
-llm = ChatHuggingFace(llm=llm1)
-
-# ✅ Request model
+# Request model
 class TopicRequest(BaseModel):
     topic: str
 
-# ✅ Home route
-@app.get("/", response_class=HTMLResponse)
-def root():
-    return """
-    <html>
-        <head><title>LaymanLearn Backend</title></head>
-        <body style="font-family: sans-serif;">
-            <h2>🚀 FastAPI backend is running!</h2>
-            <p>POST to <code>/api/topic</code> with a JSON body like:</p>
-            <pre>{ "topic": "Blockchain" }</pre>
-        </body>
-    </html>
-    """
+# Load OpenAI API key
+openai_api_key = os.getenv("OPENAI_API_KEY")
+llm = ChatOpenAI(api_key=openai_api_key, temperature=0.7)
 
-# ✅ Favicon route
-@app.get("/favicon.ico")
-def favicon():
-    return FileResponse("static/favicon.ico")
+# Define prompt template
+prompt_template = PromptTemplate(
+    input_variables=["topic"],
+    template="""
+Explain the topic "{topic}" in the following structure:
 
-# ✅ Main route to generate content
+### History
+### Why & How
+### Layman Explanation
+### Beginner Q&A
+"""
+)
+
+# Route for topic understanding
 @app.post("/api/topic")
-async def generate_content(req: TopicRequest):
+async def generate_topic_content(req: TopicRequest):
     try:
-        prompt_template = PromptTemplate.from_template("""
-You are an educational AI that explains topics to beginners.
-
-Given the topic: "{topic}", generate:
-
-1. History of the topic (150 words)
-2. Why & How it works (150 words)
-3. Explain in Layman Language (100 words)
-4. 5 Beginner Q&A related to it
-
-Output format must be:
-{{
-  "History": "...",
-  "Why & How": "...",
-  "Layman Explanation": "...",
-  "Beginner Q&A": "..."
-}}
-""")
-
-        # ✅ New LangChain chain syntax
+        # Create the runnable chain
         chain = prompt_template | llm
+
+        # Get result using invoke()
         response = chain.invoke({"topic": req.topic})
 
-        print("Raw LLM Response:", response)
+        # Parse response into sections
+        result = {
+            "History": "Could not generate content.",
+            "Why & How": "Could not generate content.",
+            "Layman Explanation": "Could not generate content.",
+            "Beginner Q&A": "Could not generate content.",
+        }
 
-        # ✅ Handle output format (response could be string or dict depending on model)
-        raw_text = response if isinstance(response, str) else str(response)
-
-        # ✅ Parse the response using regex
-        sections = ["History", "Why & How", "Layman Explanation", "Beginner Q&A"]
-        result = {}
-        for section in sections:
-            pattern = rf'"{section}"\s*:\s*"(.+?)"(?:,|\n|$)'
-            match = re.search(pattern, raw_text, re.DOTALL)
-            if match:
-                result[section] = match.group(1).strip()
-            else:
-                result[section] = "Could not parse this section."
+        if isinstance(response, str):
+            parts = response.split("###")
+            for part in parts:
+                if "History" in part:
+                    result["History"] = part.replace("History", "").strip()
+                elif "Why & How" in part:
+                    result["Why & How"] = part.replace("Why & How", "").strip()
+                elif "Layman Explanation" in part:
+                    result["Layman Explanation"] = part.replace("Layman Explanation", "").strip()
+                elif "Beginner Q&A" in part:
+                    result["Beginner Q&A"] = part.replace("Beginner Q&A", "").strip()
 
         return result
 
     except Exception as e:
-        print("Error:", str(e))
         return {
             "History": "Could not generate content.",
             "Why & How": "Could not generate content.",
@@ -105,4 +81,5 @@ Output format must be:
             "Beginner Q&A": "Could not generate content.",
             "error": str(e)
         }
+
 
