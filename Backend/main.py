@@ -29,7 +29,7 @@ hf_api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 llm = HuggingFaceHub(
     repo_id="Qwen/Qwen3-Coder-480B-A35B-Instruct",  # or use any other supported HF model
-   model_kwargs={"temperature": 0.7, "max_length": 1024}
+
     huggingfacehub_api_token=hf_api_key
 )
 
